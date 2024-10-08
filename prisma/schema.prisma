@@ -15,7 +15,32 @@ datasource db {
 }
 
 model User {
-  id           String  @id @unique
-  fullName     String?
-  email        String  @unique
+  id       String  @id @unique
+  fullName String?
+  email    String  @unique
+  notes    Note[]
+  tags     Tag[]   
 }
+
+model Note {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String
+  date      DateTime @default(now())
+  tags      Tag[]    @relation("NoteTags") 
+  isPinned  Boolean  @default(false)
+  userId    String
+  recording String?
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Tag {
+  id     Int    @id @default(autoincrement())
+  name   String @unique
+  notes  Note[] @relation("NoteTags")
+  userId String
+  user   User   @relation(fields: [userId], references: [id])  
+
+  @@unique([name, userId])
+}
+
