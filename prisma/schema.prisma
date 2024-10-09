@@ -25,7 +25,7 @@ model User {
 model Note {
   id        Int      @id @default(autoincrement())
   title     String
-  content   String
+  content   String?
   date      DateTime @default(now())
   tags      Tag[]    @relation("NoteTags") 
   isPinned  Boolean  @default(false)

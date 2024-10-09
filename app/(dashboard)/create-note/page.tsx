@@ -1,4 +1,5 @@
 "use client";
+import "regenerator-runtime/runtime";
 import { useState, useEffect } from "react";
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   ListOrdered,
   Square,
   Trash2,
+  Router,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -20,6 +22,10 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { ReactMediaRecorder } from "react-media-recorder";
 import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
+import SpeechRecognition, {
+  useSpeechRecognition,
+} from "react-speech-recognition"; // New Import
+import { useRouter } from "next/navigation";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
@@ -48,19 +54,29 @@ const generateRandomString = (length: number) => {
 
 export default function CreateNote() {
   const [title, setTitle] = useState("");
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingId, setRecordingId] = useState<string | null>(null);
+  const router = useRouter();
 
+  const { transcript, resetTranscript, browserSupportsSpeechRecognition } =
+    useSpeechRecognition();
+
+  useEffect(() => {
+    if (!browserSupportsSpeechRecognition) {
+      console.error("Browser does not support speech recognition.");
+    }
+  }, [browserSupportsSpeechRecognition]);
+
+  // Tiptap Editor setup
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Placeholder.configure({
-        placeholder: "Start typing your note here...",
-      }),
+      Placeholder.configure({ placeholder: "Start typing your note here..." }),
     ],
     content: "",
     editorProps: {
@@ -72,8 +88,32 @@ export default function CreateNote() {
     onUpdate: ({ editor }) => {
       // Handle content updates here
     },
-    immediatelyRender: false, // Add this line to fix the SSR issue
   });
+
+  // Update the editor content with the transcript
+  useEffect(() => {
+    if (transcript && editor) {
+      editor
+        .chain()
+        .focus()
+        .insertContent(transcript + " ")
+        .run();
+      resetTranscript(); // Clear the transcript after it's been inserted
+    }
+  }, [transcript, editor]);
+
+  // Start/Stop recording and transcription
+  const startRecordingAndTranscription = () => {
+    setRecordingUrl("");
+    setIsRecording(true);
+    resetTranscript();
+    SpeechRecognition.startListening({ continuous: true });
+  };
+
+  const stopRecordingAndTranscription = () => {
+    setIsRecording(false);
+    SpeechRecognition.stopListening();
+  };
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -103,13 +143,18 @@ export default function CreateNote() {
       .padStart(2, "0")}`;
   };
 
-  // Handle note creation
   const saveNote = async () => {
     try {
       // Get editor content
       const content = editor?.getHTML() || "";
 
-      // Send data to API
+      if (!title) {
+        setTitleError("Please add a title before saving the note.");
+        return;
+      }
+
+      setTitleError(null);
+
       const response = await axios.post("/api/note/create", {
         title,
         content,
@@ -119,7 +164,7 @@ export default function CreateNote() {
 
       if (response.status === 200) {
         console.log("Note created:", response.data);
-        // Redirect or show success message
+        router.push("/dashboard");
       } else {
         console.error("Failed to create note:", response.data);
       }
@@ -141,21 +186,31 @@ export default function CreateNote() {
   };
 
   const handleStopRecording = async (blobUrl: string, blob: Blob) => {
-    setRecordingUrl(blobUrl);
-    console.log(blobUrl);
-
+    setIsRecording(false); // Stop recording
+    SpeechRecognition.stopListening(); // Stop speech recognition
+  
     const randomString = generateRandomString(8);
     const fileName = `recording_${randomString}.wav`;
-
+  
     const file = new File([blob], fileName, { type: "audio/wav" });
-
+  
     const recordingPath = await uploadToSupabase(file);
     if (recordingPath) {
-      setRecordingId(recordingPath);
+      // Get public URL of the uploaded file
+      const { data, error } = supabase.storage
+        .from("recordings")
+        .getPublicUrl(recordingPath);
+  
+      if (error) {
+        console.error("Error getting public URL:", error);
+        return;
+      }
+  
+      setRecordingUrl(data.publicUrl); 
+      setRecordingId(recordingPath); 
     }
-
-    setIsRecording(false);
   };
+  
 
   // New function to handle deleting the recording
   const deleteRecording = async () => {
@@ -163,6 +218,7 @@ export default function CreateNote() {
       const { error } = await supabase.storage
         .from("recordings")
         .remove([recordingId]);
+
       if (!error) {
         setRecordingUrl(null);
         setRecordingId(null);
@@ -199,6 +255,8 @@ export default function CreateNote() {
           onChange={(e) => setTitle(e.target.value)}
           className="w-full bg-transparent text-white text-2xl font-bold placeholder-gray-500 focus:outline-none"
         />
+        {titleError && <p className="text-red-500 text-sm">{titleError}</p>}
+
         <div className="border-t border-b border-gray-700 py-2 mb-4">
           <div className="flex space-x-2">
             <button
@@ -284,6 +342,9 @@ export default function CreateNote() {
       <div className="fixed bottom-24 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors">
         <ReactMediaRecorder
           audio
+          onStart={() => {
+            setRecordingTime(0);
+          }}
           onStop={(blobUrl: string, blob: Blob) =>
             handleStopRecording(blobUrl, blob)
           }
@@ -291,20 +352,25 @@ export default function CreateNote() {
             <div
               onClick={() => {
                 if (isRecording) {
-                  // Stop recording and save the URL when recording is done
                   stopRecording();
+                  stopRecordingAndTranscription();
                 } else {
                   // Start the recording
                   setShowRecorder(true);
                   setRecordingUrl(""); // Reset recording URL before starting
                   startRecording();
+                  startRecordingAndTranscription();
                 }
 
                 // Toggle recording state
                 setIsRecording(!isRecording);
               }}
             >
-              {isRecording ? <Square size={24} /> : <Mic size={24} />}
+              {isRecording ? (
+                <Square size={24} fill="white" />
+              ) : (
+                <Mic size={24} />
+              )}
             </div>
           )}
         />
@@ -330,7 +396,11 @@ export default function CreateNote() {
                         isRecording ? "bg-red-600" : "bg-green-600"
                       }`}
                     >
-                      {isRecording ? <Square size={20} /> : <Mic size={20} />}
+                      {isRecording ? (
+                        <Square size={20} fill="white" />
+                      ) : (
+                        <Mic size={20} />
+                      )}
                     </button>
                     <span className="text-sm">{formatTime(recordingTime)}</span>
                   </div>

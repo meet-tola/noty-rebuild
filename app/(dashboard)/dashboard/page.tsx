@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, X, Plus, Mic, MoreVertical, Edit2, Trash2, Tag, ChevronUp, ChevronDown, Pin } from 'lucide-react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { UserButton } from '@clerk/clerk-react'
+import axios from 'axios'
 
 interface Note {
   id: number;
@@ -15,26 +15,29 @@ interface Note {
   isPinned: boolean;
 }
 
-const sampleNotes: Note[] = [
-  { id: 1, title: "Meeting Notes", content: "Discuss project timeline and deliverables.", date: "2023-06-15", tags: ["work", "project"], isPinned: false },
-  { id: 2, title: "Shopping List", content: "Milk, eggs, bread, fruits", date: "2023-06-16", tags: ["personal", "shopping"], isPinned: true },
-  { id: 3, title: "Book Ideas", content: "Sci-fi novel about time travel", date: "2023-06-17", tags: ["creative", "writing"], isPinned: false },
-  { id: 4, title: "Workout Plan", content: "Monday: Cardio, Tuesday: Strength Training", date: "2023-06-18", tags: ["health", "fitness"], isPinned: true },
-]
-
-const allTags = Array.from(new Set(sampleNotes.flatMap(note => note.tags)))
+interface TagResponse {
+  id: number;
+  name: string;
+  userId: string;
+}
 
 export default function Note() {
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null)
-  const [filteredNotes, setFilteredNotes] = useState<Note[]>(sampleNotes)
+  const [filteredNotes, setFilteredNotes] = useState<Note[]>([])
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [showTags, setShowTags] = useState(true)
+  const [allTags, setAllTags] = useState<string[]>([])
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const filtered = sampleNotes.filter(note =>
+    fetchNotes()
+    fetchTags()
+  }, [])
+
+  useEffect(() => {
+    const filtered = filteredNotes.filter(note =>
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
       (!selectedTag || note.tags.includes(selectedTag))
     )
@@ -58,6 +61,30 @@ export default function Note() {
     }
   }, [])
 
+  const fetchNotes = async () => {
+    try {
+      const response = await axios.get('/api/note')
+      const notes = response.data
+      const sortedNotes = notes.sort((a: Note, b: Note) => {
+        if (a.isPinned === b.isPinned) return 0;
+        return a.isPinned ? -1 : 1;
+      });
+      setFilteredNotes(sortedNotes)
+    } catch (error) {
+      console.error('Error fetching notes:', error)
+    }
+  }
+
+  const fetchTags = async () => {
+    try {
+      const response = await axios.get<TagResponse[]>('/api/note/tags')
+      const tagNames = response.data.map(tag => tag.name)
+      setAllTags(tagNames)
+    } catch (error) {
+      console.error('Error fetching tags:', error)
+    }
+  }
+
   const toggleSearch = () => {
     setShowSearch(!showSearch)
     if (showSearch) {
@@ -73,20 +100,27 @@ export default function Note() {
     setShowTags(!showTags)
   }
 
-  const togglePinNote = (id: number) => {
-    const updatedNotes = filteredNotes.map(note =>
-      note.id === id ? { ...note, isPinned: !note.isPinned } : note
-    )
-    const sortedNotes = updatedNotes.sort((a, b) => {
-      if (a.isPinned === b.isPinned) return 0;
-      return a.isPinned ? -1 : 1;
-    });
-    setFilteredNotes(sortedNotes)
+  const togglePinNote = async (id: number) => {
+    try {
+      await axios.post(`/api/note/${id}/pin`)
+      fetchNotes() // Refresh notes after pinning/unpinning
+    } catch (error) {
+      console.error('Error toggling pin status:', error)
+    }
+  }
+
+  const deleteNote = async (id: number) => {
+    try {
+      await axios.delete(`/api/note/${id}`)
+      fetchNotes() // Refresh notes after deleting
+    } catch (error) {
+      console.error('Error deleting note:', error)
+    }
   }
 
   return (
     <div className="bg-gray-900 min-h-screen w-full max-w-md mx-auto p-6 text-white fixed inset-0 overflow-y-auto">
-      <header className="flex justify-between items-center mb-6 relative">
+      <div className="flex justify-between items-center mb-6 relative">
         {!showSearch && <h2 className="text-2xl font-semibold">My Notes</h2>}
         <div className={`flex items-center space-x-2 ${showSearch ? 'w-full' : ''}`}>
           {showSearch ? (
@@ -112,7 +146,7 @@ export default function Note() {
               <UserButton />
           )}
         </div>
-      </header>
+      </div>
 
       <div className="mb-4 relative">
         {showTags && (
@@ -186,9 +220,12 @@ export default function Note() {
                       <Pin size={14} className="inline mr-2" />
                       {note.isPinned ? 'Unpin Note' : 'Pin Note'}
                     </button>
-                    <button className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-600">
+                    <button 
+                      className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-600"
+                      onClick={() => deleteNote(note.id)}
+                    >
                       <Trash2 size={14} className="inline mr-2" />
-                      Delete Note
+                      Delete 
                     </button>
                   </div>
                 )}
