@@ -65,17 +65,12 @@ export default function CreateNote() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [btnLoading, setBtnLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   const router = useRouter();
 
-  const { transcript, resetTranscript, browserSupportsSpeechRecognition } =
-    useSpeechRecognition();
+  const { transcript, resetTranscript } = useSpeechRecognition();
 
-  // useEffect(() => {
-  //   if (!browserSupportsSpeechRecognition) {
-  //     console.error("Browser does not support speech recognition.");
-  //   }
-  // }, [browserSupportsSpeechRecognition]);
 
   // Tiptap Editor setup
   const editor = useEditor({
@@ -97,17 +92,18 @@ export default function CreateNote() {
     },
   });
 
+  useEffect(() => {
+    // Set client-side flag
+    setIsClient(typeof window !== "undefined");
+  }, []);
+
   // Update the editor content with the transcript
   useEffect(() => {
-    if (transcript && editor) {
-      editor
-        .chain()
-        .focus()
-        .insertContent(transcript + " ")
-        .run();
-      resetTranscript(); // Clear the transcript after it's been inserted
+    if (isClient && transcript && editor) {
+      editor.chain().focus().insertContent(transcript + " ").run();
+      resetTranscript();
     }
-  }, [transcript, editor]);
+  }, [transcript, editor, isClient]);
 
   // Start/Stop recording and transcription
   const startRecordingAndTranscription = () => {
@@ -348,14 +344,11 @@ export default function CreateNote() {
       </div>
 
       <div className="fixed bottom-24 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors">
-        <ReactMediaRecorder
+        {isClient && (
+          <ReactMediaRecorder
           audio
-          onStart={() => {
-            setRecordingTime(0);
-          }}
-          onStop={(blobUrl: string, blob: Blob) =>
-            handleStopRecording(blobUrl, blob)
-          }
+          onStart={() => setRecordingTime(0)}
+          onStop={(blobUrl, blob) => handleStopRecording(blobUrl, blob)}
           render={({ startRecording, stopRecording }) => (
             <div
               onClick={() => {
@@ -363,28 +356,22 @@ export default function CreateNote() {
                   stopRecording();
                   stopRecordingAndTranscription();
                 } else {
-                  // Start the recording
                   setShowRecorder(true);
-                  setRecordingUrl(""); // Reset recording URL before starting
+                  setRecordingUrl("");
                   startRecording();
                   startRecordingAndTranscription();
                 }
-
-                // Toggle recording state
                 setIsRecording(!isRecording);
               }}
             >
-              {isRecording ? (
-                <Square size={24} fill="white" />
-              ) : (
-                <Mic size={24} />
-              )}
+              {isRecording ? <Square size={24} fill="white" /> : <Mic size={24} />}
             </div>
           )}
         />
+        )}
       </div>
 
-      {showRecorder && (
+      {isClient && showRecorder && (
         <ReactMediaRecorder
           audio
           onStart={() => {
