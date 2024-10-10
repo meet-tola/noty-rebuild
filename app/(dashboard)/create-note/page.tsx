@@ -71,11 +71,11 @@ export default function CreateNote() {
   const { transcript, resetTranscript, browserSupportsSpeechRecognition } =
     useSpeechRecognition();
 
-  useEffect(() => {
-    if (!browserSupportsSpeechRecognition) {
-      console.error("Browser does not support speech recognition.");
-    }
-  }, [browserSupportsSpeechRecognition]);
+  // useEffect(() => {
+  //   if (!browserSupportsSpeechRecognition) {
+  //     console.error("Browser does not support speech recognition.");
+  //   }
+  // }, [browserSupportsSpeechRecognition]);
 
   // Tiptap Editor setup
   const editor = useEditor({
