@@ -206,14 +206,9 @@ export default function CreateNote() {
     const recordingPath = await uploadToSupabase(file);
     if (recordingPath) {
       // Get public URL of the uploaded file
-      const { data, error } = supabase.storage
+      const { data } = supabase.storage
         .from("recordings")
         .getPublicUrl(recordingPath);
-
-      if (error) {
-        console.error("Error getting public URL:", error);
-        return;
-      }
 
       setRecordingUrl(data.publicUrl);
       setRecordingId(recordingPath);
