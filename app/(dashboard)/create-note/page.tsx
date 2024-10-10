@@ -13,10 +13,13 @@ import {
   Square,
   Trash2,
   Router,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEditor, EditorContent } from "@tiptap/react";
+import BulletList from "@tiptap/extension-bullet-list";
+import OrderedList from "@tiptap/extension-ordered-list";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { ReactMediaRecorder } from "react-media-recorder";
@@ -61,6 +64,8 @@ export default function CreateNote() {
   const [showRecorder, setShowRecorder] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [btnLoading, setBtnLoading] = useState(false);
+
   const router = useRouter();
 
   const { transcript, resetTranscript, browserSupportsSpeechRecognition } =
@@ -77,6 +82,8 @@ export default function CreateNote() {
     extensions: [
       StarterKit,
       Placeholder.configure({ placeholder: "Start typing your note here..." }),
+      BulletList,
+      OrderedList,
     ],
     content: "",
     editorProps: {
@@ -144,6 +151,7 @@ export default function CreateNote() {
   };
 
   const saveNote = async () => {
+    setBtnLoading(true);
     try {
       // Get editor content
       const content = editor?.getHTML() || "";
@@ -163,13 +171,14 @@ export default function CreateNote() {
       });
 
       if (response.status === 200) {
-        console.log("Note created:", response.data);
         router.push("/dashboard");
       } else {
         console.error("Failed to create note:", response.data);
       }
     } catch (error) {
       console.error("Error saving note:", error);
+    } finally {
+      setBtnLoading(false);
     }
   };
 
@@ -188,29 +197,28 @@ export default function CreateNote() {
   const handleStopRecording = async (blobUrl: string, blob: Blob) => {
     setIsRecording(false); // Stop recording
     SpeechRecognition.stopListening(); // Stop speech recognition
-  
+
     const randomString = generateRandomString(8);
     const fileName = `recording_${randomString}.wav`;
-  
+
     const file = new File([blob], fileName, { type: "audio/wav" });
-  
+
     const recordingPath = await uploadToSupabase(file);
     if (recordingPath) {
       // Get public URL of the uploaded file
       const { data, error } = supabase.storage
         .from("recordings")
         .getPublicUrl(recordingPath);
-  
+
       if (error) {
         console.error("Error getting public URL:", error);
         return;
       }
-  
-      setRecordingUrl(data.publicUrl); 
-      setRecordingId(recordingPath); 
+
+      setRecordingUrl(data.publicUrl);
+      setRecordingId(recordingPath);
     }
   };
-  
 
   // New function to handle deleting the recording
   const deleteRecording = async () => {
@@ -222,7 +230,6 @@ export default function CreateNote() {
       if (!error) {
         setRecordingUrl(null);
         setRecordingId(null);
-        console.log("Recording deleted successfully.");
         setIsRecording(false);
       } else {
         console.error("Error deleting recording:", error);
@@ -231,10 +238,10 @@ export default function CreateNote() {
   };
 
   return (
-    <div className="bg-gray-900 min-h-screen w-full max-w-3xl mx-auto p-6 text-white">
+    <div className="bg-gray-950 min-h-screen w-full max-w-md mx-auto p-6 text-white">
       <header className="flex justify-between items-center mb-6">
         <Link
-          href="/"
+          href="/dashboard"
           className="text-white hover:text-gray-300 transition-colors"
         >
           <ArrowLeft size={24} />
@@ -243,7 +250,13 @@ export default function CreateNote() {
           onClick={saveNote}
           className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
         >
-          Save
+          {btnLoading ? (
+            <div className="flex gap-2 items-center">
+              <Loader2 className="animate-spin" /> Saving
+            </div>
+          ) : (
+            "Save"
+          )}
         </button>
       </header>
 

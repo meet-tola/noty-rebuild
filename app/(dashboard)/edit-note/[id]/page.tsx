@@ -1,4 +1,5 @@
-"use client";
+"use client"
+
 import { useState, useEffect, useRef } from 'react'
 import {
   ArrowLeft,
@@ -12,31 +13,35 @@ import {
   ListOrdered,
   Play,
   Pause,
-} from "lucide-react";
-import Link from "next/link";
+  Loader2,
+} from "lucide-react"
+import Link from "next/link"
 import axios from 'axios'
 import { useRouter } from 'next/navigation'
-import dynamic from "next/dynamic";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
+import dynamic from "next/dynamic"
+import { useEditor, EditorContent } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
 
 const TiptapEditor = dynamic(
   () => import("@tiptap/react").then((mod) => mod.EditorContent),
   {
     ssr: false,
   }
-);
+)
 
-const sampleTags = ["work", "personal", "ideas", "todo", "important"];
+const sampleTags = ["work", "personal", "ideas", "todo", "important"]
 
 export default function EditNote({ params }: { params: { id: string } }) {
   const [title, setTitle] = useState('')
-  const [tags, setTags] = useState<string[]>([]);
-    const [recordingUrl, setRecordingUrl] = useState<string | null>(null)
+  const [tags, setTags] = useState<string[]>([])
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
   const [totalDuration, setTotalDuration] = useState(0)
   const audioRef = useRef<HTMLAudioElement>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+
   const router = useRouter()
 
   const editor = useEditor({
@@ -49,30 +54,31 @@ export default function EditNote({ params }: { params: { id: string } }) {
       },
     },
     onUpdate: ({ editor }) => {
-      // Handle content updates here
+      // Handle content update if needed
     },
-    immediatelyRender: false, // Add this line to fix the SSR issue
-  });
+    immediatelyRender: false, 
+  })
 
   useEffect(() => {
     const fetchNote = async () => {
+      setIsLoading(true)
       try {
-        const response = await axios.get(`/api/note/${params.id}`);
-        const note = response.data;
-        console.log("note", note);
+        const response = await axios.get(`/api/note/${params.id}`)
+        const note = response.data
         
-        setTitle(note.title);
-        setTags(note.tags.map((tag: { id: string, name: string }) => tag.name)); // Load only tag names
-        editor?.commands.setContent(note.content);
-        setRecordingUrl(note.recording);
+        setTitle(note.title)
+        setTags(note.tags.map((tag: { id: string, name: string }) => tag.name))
+        editor?.commands.setContent(note.content)
+        setRecordingUrl(note.recording)
       } catch (error) {
-        console.error('Error fetching note:', error);
+        console.error('Error fetching note:', error)
+      } finally {
+        setIsLoading(false)
       }
-    };
+    }
 
     fetchNote()
   }, [params.id, editor])
-
 
   useEffect(() => {
     if (recordingUrl && audioRef.current) {
@@ -83,31 +89,31 @@ export default function EditNote({ params }: { params: { id: string } }) {
   }, [recordingUrl])
 
   const saveNote = async () => {
+    setIsSaving(true)
     try {
-      const content = editor?.getHTML() || '';
-      const response = await axios.put(`/api/note/${params.id}`, {
+      const content = editor?.getHTML() || ''
+      const response = await axios.patch(`/api/note/${params.id}`, {
         title,
         content,
-        tags,  // Save the updated tags
-        recording: recordingUrl,
-      });
+        tags,
+      })
 
       if (response.status === 200) {
-        console.log('Note updated:', response.data);
-        router.push('/dashboard');
+        router.push('/dashboard')
       } else {
-        console.error('Failed to update note:', response.data);
+        console.error('Failed to update note:', response.data)
       }
     } catch (error) {
-      console.error('Error updating note:', error);
+      console.error('Error updating note:', error)
+    } finally {
+      setIsSaving(false)
     }
-  };
+  }
 
   const deleteNote = async () => {
     try {
       const response = await axios.delete(`/api/note/${params.id}`)
       if (response.status === 200) {
-        console.log('Note deleted:', response.data)
         router.push('/dashboard')
       } else {
         console.error('Failed to delete note:', response.data)
@@ -119,14 +125,13 @@ export default function EditNote({ params }: { params: { id: string } }) {
 
   const addTag = (tag: string) => {
     if (tags && Array.isArray(tags) && !tags.includes(tag)) {
-      setTags((prevTags) => [...prevTags, tag]); // Append new tags to existing ones
+      setTags((prevTags) => [...prevTags, tag])
     }
-  };
-  
+  }
 
   const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag)); // Remove the tag from the list
-  };
+    setTags(tags.filter((t) => t !== tag))
+  }
 
   const togglePlayback = () => {
     if (audioRef.current) {
@@ -141,50 +146,70 @@ export default function EditNote({ params }: { params: { id: string } }) {
 
   const formatTime = (time: number) => {
     if (isNaN(time) || !isFinite(time)) {
-      return '00:00'; // Return '00:00' if the time is invalid
+      return '00:00'
     }
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
+    const minutes = Math.floor(time / 60)
+    const seconds = Math.floor(time % 60)
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
 
   useEffect(() => {
     const handleMetadataLoaded = () => {
-      setTotalDuration(audioRef.current?.duration || 0);
-    };
+      setTotalDuration(audioRef.current?.duration || 0)
+    }
 
     const handleTimeUpdate = () => {
-      setPlaybackTime(audioRef.current?.currentTime || 0);
-    };
+      setPlaybackTime(audioRef.current?.currentTime || 0)
+    }
 
-    const audioElement = audioRef.current;
+    const audioElement = audioRef.current
     if (audioElement) {
-      audioElement.addEventListener('loadedmetadata', handleMetadataLoaded);
-      audioElement.addEventListener('timeupdate', handleTimeUpdate);
+      audioElement.addEventListener('loadedmetadata', handleMetadataLoaded)
+      audioElement.addEventListener('timeupdate', handleTimeUpdate)
     }
 
     return () => {
       if (audioElement) {
-        audioElement.removeEventListener('loadedmetadata', handleMetadataLoaded);
-        audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+        audioElement.removeEventListener('loadedmetadata', handleMetadataLoaded)
+        audioElement.removeEventListener('timeupdate', handleTimeUpdate)
       }
-    };
-  }, [recordingUrl]);
+    }
+  }, [recordingUrl])
 
   return (
-    <div className="bg-gray-900 min-h-screen w-full max-w-3xl mx-auto p-6 text-white">
+    <div className="bg-gray-950 min-h-screen w-full max-w-md mx-auto p-6 text-white relative">
+      {(isLoading) && (
+        <div className="absolute inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+        </div>
+      )}
       <header className="flex justify-between items-center mb-6">
         <Link
-          href="/"
+          href="/dashboard"
           className="text-white hover:text-gray-300 transition-colors"
         >
           <ArrowLeft size={24} />
         </Link>
         <div className="flex space-x-2 items-center">
-          <button className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors" onClick={saveNote}>
-            Save
+          <button 
+            className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors flex items-center"
+            onClick={saveNote}
+            disabled={isLoading || isSaving}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="animate-spin mr-2" size={20} />
+                Saving
+              </>
+            ) : (
+              "Save"
+            )}
           </button>
-          <button className="bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors" onClick={deleteNote}>
+          <button 
+            className="bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
+            onClick={deleteNote}
+            disabled={isLoading || isSaving}
+          >
             <Trash2 size={20} />
           </button>
         </div>
@@ -196,6 +221,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="w-full bg-transparent text-white text-2xl font-bold placeholder-gray-500 focus:outline-none"
+          disabled={isLoading}
         />
         <div className="border-t border-b border-gray-700 py-2 mb-4">
           <div className="flex space-x-2">
@@ -205,6 +231,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
               className={`p-2 rounded ${
                 editor?.isActive("bold") ? "bg-gray-700" : ""
               }`}
+              disabled={isLoading}
             >
               <Bold size={20} />
             </button>
@@ -214,6 +241,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
               className={`p-2 rounded ${
                 editor?.isActive("italic") ? "bg-gray-700" : ""
               }`}
+              disabled={isLoading}
             >
               <Italic size={20} />
             </button>
@@ -223,6 +251,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
               className={`p-2 rounded ${
                 editor?.isActive("bulletList") ? "bg-gray-700" : ""
               }`}
+              disabled={isLoading}
             >
               <List size={20} />
             </button>
@@ -232,6 +261,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
               className={`p-2 rounded ${
                 editor?.isActive("orderedList") ? "bg-gray-700" : ""
               }`}
+              disabled={isLoading}
             >
               <ListOrdered size={20} />
             </button>
@@ -259,6 +289,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
                   type="button"
                   onClick={() => removeTag(tag)}
                   className="ml-1 text-gray-400 hover:text-white"
+                  disabled={isLoading}
                 >
                   &times;
                 </button>
@@ -276,7 +307,8 @@ export default function EditNote({ params }: { params: { id: string } }) {
                 key={tag}
                 type="button"
                 onClick={() => addTag(tag)}
-                className="bg-gray-700 text-white px-2 py-1  rounded-full text-sm hover:bg-gray-600 transition-colors flex items-center"
+                className="bg-gray-700 text-white px-2 py-1 rounded-full text-sm hover:bg-gray-600 transition-colors flex items-center"
+                disabled={isLoading}
               >
                 <Plus size={14} className="mr-1" />
                 {tag}
@@ -294,6 +326,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
                 type="button"
                 onClick={togglePlayback}
                 className={`p-2 rounded-full ${isPlaying ? "bg-purple-600" : "bg-green-600"}`}
+                disabled={isLoading}
               >
                 {isPlaying ? <Pause size={20} /> : <Play size={20} />}
               </button>
@@ -311,5 +344,5 @@ export default function EditNote({ params }: { params: { id: string } }) {
         </div>
       )}
     </div>
-  );
+  )
 }
