@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   try {
     const note = await prisma.note.findUnique({
-      where: { id: Number(params.id) },
+      where: { id: params.id },
       select: { userId: true }
     });
 
@@ -21,7 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const updatedNote = await prisma.note.update({
-      where: { id: Number(params.id) },
+      where: { id: params.id },
       data: { isPinned },
     });
 

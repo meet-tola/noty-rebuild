@@ -14,7 +14,7 @@ export async function GET(
 
   try {
     const note = await prisma.note.findUnique({
-      where: { id: Number(params.id) },
+      where: { id: params.id },
       include: {
         tags: true,
       },
@@ -59,7 +59,7 @@ export async function PATCH(
     );
 
     const updatedNote = await prisma.note.update({
-      where: { id: Number(params.id) },
+      where: { id: params.id },
       data: {
         title,
         content,
@@ -89,7 +89,7 @@ export async function DELETE(
 
   try {
     const note = await prisma.note.delete({
-      where: { id: Number(params.id) },
+      where: { id: params.id },
     });
 
     return NextResponse.json({ message: "Note deleted successfully" });
