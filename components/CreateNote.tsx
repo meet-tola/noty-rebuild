@@ -65,7 +65,6 @@ export default function CreateNote() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [btnLoading, setBtnLoading] = useState(false);
-  const [isClient, setIsClient] = useState(false);
 
   const router = useRouter();
 
@@ -92,18 +91,13 @@ export default function CreateNote() {
     },
   });
 
-  useEffect(() => {
-    // Set client-side flag
-    setIsClient(typeof window !== "undefined");
-  }, []);
 
-  // Update the editor content with the transcript
   useEffect(() => {
-    if (isClient && transcript && editor) {
+    if (transcript && editor) {
       editor.chain().focus().insertContent(transcript + " ").run();
       resetTranscript();
     }
-  }, [transcript, editor, isClient]);
+  }, [transcript, editor]);
 
   // Start/Stop recording and transcription
   const startRecordingAndTranscription = () => {
@@ -344,7 +338,7 @@ export default function CreateNote() {
       </div>
 
       <div className="fixed bottom-24 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors">
-        {isClient && (
+        
           <ReactMediaRecorder
           audio
           onStart={() => setRecordingTime(0)}
@@ -368,10 +362,9 @@ export default function CreateNote() {
             </div>
           )}
         />
-        )}
       </div>
 
-      {isClient && showRecorder && (
+      {showRecorder && (
         <ReactMediaRecorder
           audio
           onStart={() => {
