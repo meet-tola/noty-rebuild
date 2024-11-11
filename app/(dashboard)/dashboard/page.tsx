@@ -378,7 +378,7 @@ export default function Note() {
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent border-none outline-none px-3 py-2 w-full text-sm text-gray-100"
+                className="bg-transparent border-none outline-none px-3 py-2 w-full text-[16px] text-gray-100"
                 autoFocus
               />
               <Mic className="w-5 h-5 mr-2 text-gray-400" />
