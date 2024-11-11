@@ -1,9 +1,8 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
-  Trash2,
   Mic,
   Sparkles,
   Plus,
@@ -14,35 +13,45 @@ import {
   Play,
   Pause,
   Loader2,
-} from "lucide-react"
-import Link from "next/link"
-import axios from 'axios'
-import { useRouter } from 'next/navigation'
-import dynamic from "next/dynamic"
-import { useEditor, EditorContent } from "@tiptap/react"
-import StarterKit from "@tiptap/starter-kit"
+  CircleEllipsis,
+  Share,
+  Pin,
+  Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import axios from "axios";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const TiptapEditor = dynamic(
   () => import("@tiptap/react").then((mod) => mod.EditorContent),
   {
     ssr: false,
   }
-)
+);
 
-const sampleTags = ["work", "personal", "ideas", "todo", "important"]
+const sampleTags = ["work", "personal", "ideas", "todo", "important"];
 
 export default function EditNote({ params }: { params: { id: string } }) {
-  const [title, setTitle] = useState('')
-  const [tags, setTags] = useState<string[]>([])
-  const [recordingUrl, setRecordingUrl] = useState<string | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [playbackTime, setPlaybackTime] = useState(0)
-  const [totalDuration, setTotalDuration] = useState(0)
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const [title, setTitle] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const router = useRouter()
+  const router = useRouter();
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -53,132 +62,148 @@ export default function EditNote({ params }: { params: { id: string } }) {
           "prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[300px] text-white",
       },
     },
-    onUpdate: ({ editor }) => {
-      // Handle content update if needed
-    },
-    immediatelyRender: false, 
-  })
+    onUpdate: ({ editor }) => {},
+    immediatelyRender: false,
+  });
 
   useEffect(() => {
     const fetchNote = async () => {
-      setIsLoading(true)
+      setIsLoading(true);
       try {
-        const response = await axios.get(`/api/note/${params.id}`)
-        const note = response.data
-        
-        setTitle(note.title)
-        setTags(note.tags.map((tag: { id: string, name: string }) => tag.name))
-        editor?.commands.setContent(note.content)
-        setRecordingUrl(note.recording)
-      } catch (error) {
-        console.error('Error fetching note:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+        const response = await axios.get(`/api/note/${params.id}`);
+        const note = response.data;
 
-    fetchNote()
-  }, [params.id, editor])
+        setTitle(note.title);
+        setTags(note.tags.map((tag: { id: string; name: string }) => tag.name));
+        editor?.commands.setContent(note.content);
+        setRecordingUrl(note.recording);
+      } catch (error) {
+        console.error("Error fetching note:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNote();
+  }, [params.id, editor]);
 
   useEffect(() => {
     if (recordingUrl && audioRef.current) {
-      audioRef.current.addEventListener('loadedmetadata', () => {
-        setTotalDuration(audioRef.current?.duration || 0)
-      })
+      audioRef.current.addEventListener("loadedmetadata", () => {
+        setTotalDuration(audioRef.current?.duration || 0);
+      });
     }
-  }, [recordingUrl])
+  }, [recordingUrl]);
 
   const saveNote = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      const content = editor?.getHTML() || ''
-      const response = await axios.patch(`/api/note/${params.id}`, {
+      const content = editor?.getHTML() || "";
+      await axios.patch(`/api/note/${params.id}`, {
         title,
         content,
         tags,
-      })
-
-      if (response.status === 200) {
-        router.push('/dashboard')
-      } else {
-        console.error('Failed to update note:', response.data)
-      }
+      });
     } catch (error) {
-      console.error('Error updating note:', error)
+      console.error("Error updating note:", error);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const deleteNote = async () => {
     try {
-      const response = await axios.delete(`/api/note/${params.id}`)
+      const response = await axios.delete(`/api/note/${params.id}`);
       if (response.status === 200) {
-        router.push('/dashboard')
+        router.push("/dashboard");
       } else {
-        console.error('Failed to delete note:', response.data)
+        console.error("Failed to delete note:", response.data);
       }
     } catch (error) {
-      console.error('Error deleting note:', error)
+      console.error("Error deleting note:", error);
     }
-  }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (title || editor?.getHTML()) {
+        saveNote();
+      }
+    }, 2000); // Autosave every 2 seconds after changes
+    return () => clearTimeout(timeoutId);
+  }, [title, editor?.getHTML()]);
 
   const addTag = (tag: string) => {
     if (tags && Array.isArray(tags) && !tags.includes(tag)) {
-      setTags((prevTags) => [...prevTags, tag])
+      setTags((prevTags) => [...prevTags, tag]);
     }
-  }
+  };
 
   const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag))
-  }
+    setTags(tags.filter((t) => t !== tag));
+  };
 
   const togglePlayback = () => {
     if (audioRef.current) {
       if (isPlaying) {
-        audioRef.current.pause()
+        audioRef.current.pause();
       } else {
-        audioRef.current.play()
+        audioRef.current.play();
       }
-      setIsPlaying(!isPlaying)
+      setIsPlaying(!isPlaying);
     }
-  }
+  };
 
   const formatTime = (time: number) => {
     if (isNaN(time) || !isFinite(time)) {
-      return '00:00'
+      return "00:00";
     }
-    const minutes = Math.floor(time / 60)
-    const seconds = Math.floor(time % 60)
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-  }
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes.toString().padStart(2, "0")}:${seconds
+      .toString()
+      .padStart(2, "0")}`;
+  };
 
   useEffect(() => {
     const handleMetadataLoaded = () => {
-      setTotalDuration(audioRef.current?.duration || 0)
-    }
+      setTotalDuration(audioRef.current?.duration || 0);
+    };
 
     const handleTimeUpdate = () => {
-      setPlaybackTime(audioRef.current?.currentTime || 0)
-    }
+      setPlaybackTime(audioRef.current?.currentTime || 0);
+    };
 
-    const audioElement = audioRef.current
+    const audioElement = audioRef.current;
     if (audioElement) {
-      audioElement.addEventListener('loadedmetadata', handleMetadataLoaded)
-      audioElement.addEventListener('timeupdate', handleTimeUpdate)
+      audioElement.addEventListener("loadedmetadata", handleMetadataLoaded);
+      audioElement.addEventListener("timeupdate", handleTimeUpdate);
     }
 
     return () => {
       if (audioElement) {
-        audioElement.removeEventListener('loadedmetadata', handleMetadataLoaded)
-        audioElement.removeEventListener('timeupdate', handleTimeUpdate)
+        audioElement.removeEventListener(
+          "loadedmetadata",
+          handleMetadataLoaded
+        );
+        audioElement.removeEventListener("timeupdate", handleTimeUpdate);
       }
-    }
-  }, [recordingUrl])
+    };
+  }, [recordingUrl]);
+
+  const shareNote = () => {
+    // Implement share functionality
+    console.log("Sharing note...");
+  };
+
+  const pinNote = () => {
+    // Implement pin functionality
+    console.log("Pinning note...");
+  };
 
   return (
     <div className="bg-gray-950 min-h-screen w-full max-w-md mx-auto p-6 text-white relative">
-      {(isLoading) && (
+      {isLoading && (
         <div className="absolute inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
           <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
         </div>
@@ -190,29 +215,27 @@ export default function EditNote({ params }: { params: { id: string } }) {
         >
           <ArrowLeft size={24} />
         </Link>
-        <div className="flex space-x-2 items-center">
-          <button 
-            className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors flex items-center"
-            onClick={saveNote}
-            disabled={isLoading || isSaving}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="animate-spin mr-2" size={20} />
-                Saving
-              </>
-            ) : (
-              "Save"
-            )}
-          </button>
-          <button 
-            className="bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
-            onClick={deleteNote}
-            disabled={isLoading || isSaving}
-          >
-            <Trash2 size={20} />
-          </button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="text-white transition-colors">
+              <CircleEllipsis size={24} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={shareNote}>
+              <Share className="mr-2 h-4 w-4" />
+              <span>Share</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={pinNote}>
+              <Pin className="mr-2 h-4 w-4" />
+              <span>Pin</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={deleteNote}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
       <form className="space-y-4">
         <input
@@ -278,7 +301,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
       <div className="mt-8">
         <h3 className="text-lg font-semibold mb-2">Tags</h3>
         <div className="flex flex-wrap gap-2 mb-4">
-        {tags && tags.length > 0 ? (
+          {tags && tags.length > 0 ? (
             tags.map((tag) => (
               <span
                 key={tag}
@@ -325,14 +348,14 @@ export default function EditNote({ params }: { params: { id: string } }) {
               <button
                 type="button"
                 onClick={togglePlayback}
-                className={`p-2 rounded-full ${isPlaying ? "bg-purple-600" : "bg-green-600"}`}
+                className={`p-2 rounded-full ${
+                  isPlaying ? "bg-purple-600" : "bg-green-600"
+                }`}
                 disabled={isLoading}
               >
                 {isPlaying ? <Pause size={20} /> : <Play size={20} />}
               </button>
-              <span className="text-sm">
-                {formatTime(playbackTime)} 
-              </span>
+              <span className="text-sm">{formatTime(playbackTime)}</span>
             </div>
             <div className="w-1/2 bg-gray-700 h-2 rounded-full overflow-hidden">
               <div
@@ -343,6 +366,10 @@ export default function EditNote({ params }: { params: { id: string } }) {
           </div>
         </div>
       )}
+
+      {isSaving && (
+        <p className="fixed bottom-4 left-4 text-sm text-gray-400">Saving...</p>
+      )}
     </div>
-  )
+  );
 }
