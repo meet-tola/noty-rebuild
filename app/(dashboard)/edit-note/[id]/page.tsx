@@ -50,6 +50,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [pinnedNote, setPinnedNote] = useState("");
 
   const router = useRouter();
 
@@ -77,6 +78,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
         setTags(note.tags.map((tag: { id: string; name: string }) => tag.name));
         editor?.commands.setContent(note.content);
         setRecordingUrl(note.recording);
+        setPinnedNote(note.isPinned);
       } catch (error) {
         console.error("Error fetching note:", error);
       } finally {
@@ -196,9 +198,15 @@ export default function EditNote({ params }: { params: { id: string } }) {
     console.log("Sharing note...");
   };
 
-  const pinNote = () => {
-    // Implement pin functionality
-    console.log("Pinning note...");
+  const pinNote = async (isPinned: boolean) => {
+    try {
+      await axios.patch(`/api/note/pin/${params.id}`, {
+        isPinned: !isPinned,
+      });
+      window.location.reload();
+    } catch (error) {
+      console.error("Error toggling pin status:", error);
+    }
   };
 
   return (
@@ -226,9 +234,9 @@ export default function EditNote({ params }: { params: { id: string } }) {
               <Share className="mr-2 h-4 w-4" />
               <span>Share</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={pinNote}>
+            <DropdownMenuItem onClick={() => pinNote(false)}>
               <Pin className="mr-2 h-4 w-4" />
-              <span>Pin</span>
+              <span>{pinnedNote ? "Unpin Note" : "Pin Note"}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={deleteNote}>
               <Trash2 className="mr-2 h-4 w-4" />
