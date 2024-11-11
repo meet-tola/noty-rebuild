@@ -13,11 +13,19 @@ import {
   ChevronUp,
   ChevronDown,
   Pin,
+  List,
+  Grid,
 } from "lucide-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/clerk-react";
 import axios from "axios";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Note {
   id: number;
@@ -34,15 +42,22 @@ interface Tag {
   userId: string;
 }
 
+interface GroupedNotes {
+  [key: string]: Note[];
+}
+
 export default function Note() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
+  const [groupedNotes, setGroupedNotes] = useState<GroupedNotes>({});
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showTags, setShowTags] = useState(true);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"gallery" | "list">("list");
+  const [sortBy, setSortBy] = useState<"date" | "title">("date");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,29 +76,20 @@ export default function Note() {
       );
 
       const sortedNotes = [...filtered].sort((a, b) => {
-        if (a.isPinned === b.isPinned) return 0;
+        if (a.isPinned === b.isPinned) {
+          if (sortBy === "date") {
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+          } else {
+            return a.title.localeCompare(b.title);
+          }
+        }
         return a.isPinned ? -1 : 1;
       });
 
       setFilteredNotes(sortedNotes);
+      setGroupedNotes(groupNotesByDate(sortedNotes));
     }
-  }, [searchQuery, selectedTag]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setActiveDropdown(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+  }, [searchQuery, selectedTag, sortBy]);
 
   const fetchNotes = async () => {
     setIsLoading(true);
@@ -102,6 +108,7 @@ export default function Note() {
         return a.isPinned ? -1 : 1;
       });
       setFilteredNotes(sortedNotes);
+      setGroupedNotes(groupNotesByDate(sortedNotes));
     } catch (error) {
       console.error("Error fetching notes:", error);
     } finally {
@@ -162,6 +169,124 @@ export default function Note() {
     return tempDiv.textContent || tempDiv.innerText || "";
   };
 
+  const handleSortChange = (newSortBy: "date" | "title") => {
+    setSortBy(newSortBy);
+  };
+
+  const toggleViewMode = () => {
+    setViewMode(viewMode === "gallery" ? "list" : "gallery");
+  };
+
+  const groupNotesByDate = (notes: Note[]): GroupedNotes => {
+    const grouped: GroupedNotes = {
+      Today: [],
+      Yesterday: [],
+      "Previous 7 days": [],
+      "Previous 30 days": [],
+    };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    notes.forEach((note) => {
+      const noteDate = new Date(note.date);
+      noteDate.setHours(0, 0, 0, 0);
+      if (noteDate.getTime() === today.getTime()) {
+        grouped.Today.push(note);
+      } else if (noteDate.getTime() === yesterday.getTime()) {
+        grouped.Yesterday.push(note);
+      } else if (noteDate >= sevenDaysAgo) {
+        grouped["Previous 7 days"].push(note);
+      } else if (noteDate >= thirtyDaysAgo) {
+        grouped["Previous 30 days"].push(note);
+      } else {
+        const monthYear = noteDate.toLocaleString("default", {
+          month: "long",
+          year: "numeric",
+        });
+        if (!grouped[monthYear]) {
+          grouped[monthYear] = [];
+        }
+        grouped[monthYear].push(note);
+      }
+    });
+
+    return grouped;
+  };
+
+  const renderNoteCard = (note: Note) => (
+    <div
+      key={note.id}
+      className={`bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors relative ${
+        viewMode === "gallery" ? "h-32" : "h-20"
+      }`}
+      onClick={() => (window.location.href = `/edit-note/${note.id}`)}
+    >
+      <div className="flex justify-between items-start mb-2">
+        <h3 className="font-semibold text-gray-100 truncate pr-6">{note.title || "No title"}</h3>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="text-gray-400 hover:text-gray-100 transition-colors absolute top-4 right-4"
+            >
+              <MoreVertical size={16} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onSelect={() => window.location.href = `/edit-note/${note.id}`}>
+              <Edit2 size={14} className="mr-2" />
+              Edit Note
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => togglePinNote(note.id, note.isPinned)}>
+              <Pin size={14} className="mr-2" />
+              {note.isPinned ? "Unpin Note" : "Pin Note"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => deleteNote(note.id)}>
+              <Trash2 size={14} className="mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="flex justify-between items-end">
+        <p className="text-sm text-gray-400 truncate flex-grow pr-2">
+          {stripHtml(note.content)}
+        </p>
+        <span className="text-xs text-gray-500 whitespace-nowrap">
+          {new Date(note.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+      {viewMode === "gallery" && (
+        <div className="absolute bottom-4 left-4 right-4">
+          <div className="flex flex-wrap gap-1 mt-2">
+            {note.tags.slice(0, 2).map((tag) => (
+              <span
+                key={tag.id}
+                className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-full"
+              >
+                {tag.name}
+              </span>
+            ))}
+            {note.tags.length > 2 && (
+              <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-full">
+                +{note.tags.length - 2}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      {note.isPinned && (
+        <Pin size={16} className="absolute top-4 right-10 text-purple-500" />
+      )}
+    </div>
+  )
+
   return (
     <div className="bg-gray-950 min-h-screen w-full max-w-md mx-auto p-6 text-gray-100">
       <div className="flex justify-between items-center mb-6 relative">
@@ -183,13 +308,41 @@ export default function Note() {
               />
               <Mic className="w-5 h-5 mr-2 text-gray-400" />
             </div>
-          ) : null}
-          <button
-            onClick={toggleSearch}
-            className="text-gray-300 hover:text-gray-100 transition-colors"
-          >
-            {showSearch ? <X size={24} /> : <Search size={24} />}
-          </button>
+          ) : (
+            <button
+              onClick={toggleSearch}
+              className="text-gray-300 hover:text-gray-100 transition-colors"
+            >
+              <Search size={24} />
+            </button>
+          )}
+          {showSearch && (
+            <button
+              onClick={toggleSearch}
+              className="text-gray-300 hover:text-gray-100 transition-colors"
+            >
+              <X size={24} />
+            </button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="text-gray-300 hover:text-gray-100 transition-colors">
+                
+                <MoreVertical size={24} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onSelect={() => handleSortChange("date")}>
+                Sort by Date
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleSortChange("title")}>
+                Sort by Title
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={toggleViewMode}>
+                View by {viewMode === "gallery" ? "List" : "Gallery"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {!showSearch && <UserButton />}
         </div>
       </div>
@@ -232,96 +385,49 @@ export default function Note() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div
+        className={`${
+          viewMode === "gallery" ? "grid grid-cols-2 gap-4" : "space-y-4"
+        }`}
+      >
         {isLoading ? (
-          Array(6)
-            .fill(0)
-            .map((_, index) => (
-              <Skeleton
-                key={index}
-                className="h-40 w-full rounded-lg bg-gray-800"
-              />
-            ))
-        ) : filteredNotes.length === 0 ? (
-          <div className="col-span-2 text-center text-gray-400 py-8">
-            No notes found
+          <div
+            className={`${
+              viewMode === "gallery" ? "grid grid-cols-2 gap-4" : "space-y-4"
+            }`}
+          >
+            {Array(6)
+              .fill(0)
+              .map((_, index) => (
+                <Skeleton
+                  key={index}
+                  className="h-20 w-full rounded-lg bg-gray-800"
+                />
+              ))}
           </div>
         ) : (
-          filteredNotes.map((note) => (
-            <div
-              key={note.id}
-              className="bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors relative flex flex-col h-full"
-              onClick={() => (window.location.href = `/edit-note/${note.id}`)}
-            >
-              <h3 className="font-semibold mb-2 text-gray-100">{note.title}</h3>
-              <p className="text-sm text-gray-400 mb-2 flex-grow">
-                {stripHtml(note.content).substring(0, 50)}...
-              </p>
-              <div className="mt-auto">
-                <p className="text-xs text-gray-500 mb-2">{note.date}</p>
-                <div className="flex flex-wrap gap-1">
-                  {note.tags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-full"
-                    >
-                      {tag.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              {note.isPinned && (
-                <Pin
-                  size={16}
-                  className="absolute bottom-2 right-2 text-purple-500"
-                />
-              )}
-              <div className="absolute top-2 right-2" ref={dropdownRef}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveDropdown(
-                      activeDropdown === note.id ? null : note.id
-                    );
-                  }}
-                  className="text-gray-400 hover:text-gray-100 transition-colors"
+          Object.entries(groupedNotes).map(
+            ([dateGroup, notes]) =>
+              notes.length > 0 && (
+                <div
+                  key={dateGroup}
+                  className={`mb-6 ${
+                    viewMode === "gallery" ? "col-span-2" : ""
+                  }`}
                 >
-                  <MoreVertical size={16} />
-                </button>
-                {activeDropdown === note.id && (
-                  <div className="absolute right-0 mt-2 w-32 bg-gray-800 rounded-md shadow-lg z-10">
-                    <Link
-                      href={`/edit-note/${note.id}`}
-                      className="block px-4 py-2 text-sm text-gray-100 hover:bg-gray-700"
-                    >
-                      <Edit2 size={14} className="inline mr-2" />
-                      Edit Note
-                    </Link>
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-100 hover:bg-gray-700"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePinNote(note.id, note.isPinned);
-                      }}
-                    >
-                      <Pin size={14} className="inline mr-2" />
-                      {note.isPinned ? "Unpin Note" : "Pin Note"}
-                    </button>
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-100 hover:bg-gray-700"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteNote(note.id);
-                      }}
-                    >
-                      <Trash2 size={14} className="inline mr-2" />
-                      Delete
-                    </button>
+                  <h3 className="text-lg font-bold mb-2">{dateGroup}</h3>
+                  <div
+                    className={`${
+                      viewMode === "gallery"
+                        ? "grid grid-cols-2 gap-4"
+                        : "space-y-4"
+                    }`}
+                  >
+                    {notes.map(renderNoteCard)}
                   </div>
-                )}
-              </div>
-            </div>
-          ))
+                </div>
+              )
+          )
         )}
       </div>
       <Link
