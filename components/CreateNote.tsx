@@ -71,6 +71,7 @@ export default function CreateNote() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
   const [pinnedNote, setPinnedNote] = useState(false);
 
@@ -100,10 +101,10 @@ export default function CreateNote() {
   const autoSave = useCallback(
     debounce(async () => {
       setIsSaving(true);
+      setIsSaved(false); // Reset isSaved to false when starting save
       try {
         const content = editor?.getHTML() || "";
         if (noteId) {
-          // Update existing note
           await axios.patch(`/api/note/${noteId}`, {
             title,
             content,
@@ -111,22 +112,22 @@ export default function CreateNote() {
             recording: recordingUrl,
           });
         } else {
-          // Create new note
           const response = await axios.post("/api/note/create", {
             title,
             content,
             tags,
             recording: recordingUrl,
           });
-          setNoteId(response.data.id); // Set the noteId after creating a new note
+          setNoteId(response.data.id);
         }
+        setIsSaved(true); // Set isSaved to true after successful save
       } catch (error) {
         console.error("Error auto-saving note:", error);
       } finally {
         setIsSaving(false);
       }
     }, 2000),
-    [title, tags, recordingUrl, editor, noteId] // Include noteId in dependencies
+    [title, tags, recordingUrl, editor, noteId]
   );
 
   useEffect(() => {
@@ -264,27 +265,34 @@ export default function CreateNote() {
         >
           <ArrowLeft size={24} />
         </Link>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="text-white transition-colors">
-              <CircleEllipsis size={24} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={shareNote}>
-              <Share className="mr-2 h-4 w-4" />
-              <span>Share</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => pinNote(false)}>
-              <Pin className="mr-2 h-4 w-4" />
-              <span>{pinnedNote ? "Unpin Note" : "Pin Note"}</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={deleteNote}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="text-white transition-colors">
+                <CircleEllipsis size={24} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={shareNote}>
+                <Share className="mr-2 h-4 w-4" />
+                <span>Share</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => pinNote(false)}>
+                <Pin className="mr-2 h-4 w-4" />
+                <span>{pinnedNote ? "Unpin Note" : "Pin Note"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={deleteNote}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {isSaved && (
+            <Link href="/dashboard" className="text-green-500 ml-2">
+              Done
+            </Link>
+          )}
+        </div>
       </header>
 
       <form className="space-y-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft,
   Mic,
@@ -50,6 +50,7 @@ export default function EditNote({ params }: { params: { id: string } }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [pinnedNote, setPinnedNote] = useState("");
 
   const router = useRouter();
@@ -63,7 +64,9 @@ export default function EditNote({ params }: { params: { id: string } }) {
           "prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[300px] text-white",
       },
     },
-    onUpdate: ({ editor }) => {},
+    onUpdate: ({ editor }) => {
+      autoSave();
+    },
     immediatelyRender: false,
   });
 
@@ -97,21 +100,46 @@ export default function EditNote({ params }: { params: { id: string } }) {
     }
   }, [recordingUrl]);
 
-  const saveNote = async () => {
-    setIsSaving(true);
-    try {
-      const content = editor?.getHTML() || "";
-      await axios.patch(`/api/note/${params.id}`, {
-        title,
-        content,
-        tags,
-      });
-    } catch (error) {
-      console.error("Error updating note:", error);
-    } finally {
-      setIsSaving(false);
-    }
+  const autoSave = useCallback(
+    debounce(async () => {
+      setIsSaving(true);
+      setIsSaved(false);
+      try {
+        const content = editor?.getHTML() || "";
+        await axios.patch(`/api/note/${params.id}`, {
+          title,
+          content,
+          tags,
+        });
+      } catch (error) {
+        console.error("Error updating note:", error);
+      } finally {
+        setIsSaving(false);
+        setIsSaved(true);
+      }
+    }, 2000), // 2 seconds debounce
+    [title, editor, tags]
+  );
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTitle(e.target.value);
+    autoSave();
   };
+  // const saveNote = async () => {
+  //   setIsSaving(true);
+  //   try {
+  //     const content = editor?.getHTML() || "";
+  //     await axios.patch(`/api/note/${params.id}`, {
+  //       title,
+  //       content,
+  //       tags,
+  //     });
+  //   } catch (error) {
+  //     console.error("Error updating note:", error);
+  //   } finally {
+  //     setIsSaving(false);
+  //   }
+  // };
 
   const deleteNote = async () => {
     try {
@@ -126,23 +154,16 @@ export default function EditNote({ params }: { params: { id: string } }) {
     }
   };
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (title || editor?.getHTML()) {
-        saveNote();
-      }
-    }, 2000); // Autosave every 2 seconds after changes
-    return () => clearTimeout(timeoutId);
-  }, [title, editor?.getHTML()]);
-
   const addTag = (tag: string) => {
     if (tags && Array.isArray(tags) && !tags.includes(tag)) {
       setTags((prevTags) => [...prevTags, tag]);
     }
+    autoSave();
   };
 
   const removeTag = (tag: string) => {
     setTags(tags.filter((t) => t !== tag));
+    autoSave();
   };
 
   const togglePlayback = () => {
@@ -223,34 +244,41 @@ export default function EditNote({ params }: { params: { id: string } }) {
         >
           <ArrowLeft size={24} />
         </Link>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="text-white transition-colors">
-              <CircleEllipsis size={24} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={shareNote}>
-              <Share className="mr-2 h-4 w-4" />
-              <span>Share</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => pinNote(false)}>
-              <Pin className="mr-2 h-4 w-4" />
-              <span>{pinnedNote ? "Unpin Note" : "Pin Note"}</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={deleteNote}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="text-white transition-colors">
+                <CircleEllipsis size={24} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={shareNote}>
+                <Share className="mr-2 h-4 w-4" />
+                <span>Share</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => pinNote(false)}>
+                <Pin className="mr-2 h-4 w-4" />
+                <span>{pinnedNote ? "Unpin Note" : "Pin Note"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={deleteNote}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {isSaved && (
+            <Link href="/dashboard" className="text-green-500 ml-2">
+              Done
+            </Link>
+          )}
+        </div>
       </header>
       <form className="space-y-4">
         <input
           type="text"
           placeholder="Title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={handleTitleChange}
           className="w-full bg-transparent text-white text-2xl font-bold placeholder-gray-500 focus:outline-none"
           disabled={isLoading}
         />
@@ -380,4 +408,16 @@ export default function EditNote({ params }: { params: { id: string } }) {
       )}
     </div>
   );
+}
+
+function debounce(func: Function, wait: number) {
+  let timeout: NodeJS.Timeout;
+  return function executedFunction(...args: any[]) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 }
