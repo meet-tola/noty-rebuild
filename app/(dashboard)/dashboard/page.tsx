@@ -486,6 +486,24 @@ export default function Note() {
                 />
               ))}
           </div>
+        ) : Object.keys(groupedNotes).every(
+            (key) => groupedNotes[key].length === 0
+          ) ? (
+          <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] bg-gray-950 text-gray-100">
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-semibold">No notes yet</h2>
+              <p className="text-gray-400">
+                Create your first note to get started
+              </p>
+              <Link
+                href="/create-note"
+                className="inline-flex items-center px-4 py-2 bg-purple-700 text-white rounded-md hover:bg-purple-800 transition-colors"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Create Note
+              </Link>
+            </div>
+          </div>
         ) : (
           Object.entries(groupedNotes).map(
             ([dateGroup, notes]) =>

@@ -287,11 +287,7 @@ export default function CreateNote() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          {isSaved && (
-            <Link href="/dashboard" className="text-green-500 ml-2">
-              Done
-            </Link>
-          )}
+          {isSaved && <Link href="/dashboard" className="text-green-500 ml-2">Done</Link>}
         </div>
       </header>
 
