@@ -42,29 +42,24 @@ export async function PATCH(
   }
 
   try {
-    // Check if tags exist or create them
-    const tagRecords = await Promise.all(
-      tags.map(async (tag: string) => {
-        return prisma.tag.upsert({
-          where: {
-            name_userId: {
-              name: tag,
-              userId,
-            },
-          },
-          update: {}, // If the tag exists, do nothing
-          create: { name: tag, userId },
-        });
-      })
-    );
-
     const updatedNote = await prisma.note.update({
       where: { id: params.id },
       data: {
         title,
         content,
         tags: {
-          connect: tagRecords.map((tag) => ({ id: tag.id })),
+          connectOrCreate: tags.map((tag: string) => ({
+            where: {
+              name_userId: {
+                name: tag,
+                userId,
+              },
+            },
+            create: {
+              name: tag,
+              userId,
+            },
+          })),
         },
       },
     });
@@ -76,6 +71,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Error updating note" }, { status: 500 });
   }
 }
+
 
 export async function DELETE(
   req: NextRequest,

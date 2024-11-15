@@ -104,7 +104,7 @@ export default function CreateNote() {
   const autoSave = useCallback(
     debounce(async () => {
       setIsSaving(true);
-      setIsSaved(false); 
+      setIsSaved(false); // Reset isSaved to false when starting save
       try {
         const content = editor?.getHTML() || "";
         if (noteId) {
@@ -123,7 +123,7 @@ export default function CreateNote() {
           });
           setNoteId(response.data.id);
         }
-        setIsSaved(true);
+        setIsSaved(true); // Set isSaved to true after successful save
       } catch (error) {
         console.error("Error auto-saving note:", error);
       } finally {
@@ -173,17 +173,15 @@ export default function CreateNote() {
 
   const addTag = (tag: string) => {
     setTags((prevTags) => {
-      if (!prevTags.includes(tag)) {
-        return [...prevTags, tag];
-      }
-      return prevTags;
+      const newTags = prevTags.includes(tag) ? prevTags : [...prevTags, tag];
+      return newTags;
     });
-  };
-  
+  };  
+
   const removeTag = (tag: string) => {
-    setTags((prevTags) => prevTags.filter((t) => t !== tag));
+    setTags(tags.filter((t) => t !== tag));
   };
-  
+
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
