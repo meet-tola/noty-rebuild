@@ -55,17 +55,21 @@ export default function Home() {
               <div className="mx-auto mb-5 mt-[8rem] lg:mt-0 flex max-w-fit items-center justify-center space-x-2 overflow-hidden rounded-full backdrop-blur-sm bg-purple-400/30 px-7 py-2 text-black dark:text-white">
                 <Edit className="h-5 w-5" />
                 <p className="text-sm font-semibold ">
-                  Find Your Peace in your Note
+                  Your Thoughts, Effortlessly Captured.
                 </p>
               </div>
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                  Create Notes with ease
+                  AI-Powered Notes: Speak, Save, Simplify.
                 </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-                  Sort your notes easily. Lorem ipsum dolor sit amet, consetetur
-                  sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut
-                  labore et d
+                  Description: Transform your ideas into polished, professional
+                  notes—just by talking. Our AI-powered note-taking app lets you
+                  capture thoughts using voice-to-text technology and refines
+                  them with advanced content rephrasing, so every note is clear,
+                  concise, and impactful. Whether you’re brainstorming, drafting
+                  emails, or keeping track of your daily inspirations, we turn
+                  your words into your best work.
                 </p>
               </div>
               <div className="space-x-4">
