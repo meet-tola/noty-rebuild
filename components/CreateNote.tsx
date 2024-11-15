@@ -453,7 +453,7 @@ export default function CreateNote() {
                         isRecording
                           ? stopRecording
                           : isPlaying
-                          ? null
+                          ? undefined 
                           : recordingUrl
                           ? startPlayback
                           : startRecording

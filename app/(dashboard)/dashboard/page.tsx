@@ -129,7 +129,7 @@ export default function Note() {
     }
   };
 
-  const handleTagClick = (tagName: string) => {
+  const handleTagClick = (tagName: string | null) => {
     setSelectedTag(selectedTag === tagName ? null : tagName);
   };
 
