@@ -16,6 +16,7 @@ import {
   Share,
   Pin,
   CircleEllipsis,
+  Play,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -74,6 +75,8 @@ export default function CreateNote() {
   const [isSaved, setIsSaved] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
   const [pinnedNote, setPinnedNote] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playTime, setPlayTime] = useState(0);
 
   const router = useRouter();
 
@@ -101,7 +104,7 @@ export default function CreateNote() {
   const autoSave = useCallback(
     debounce(async () => {
       setIsSaving(true);
-      setIsSaved(false); // Reset isSaved to false when starting save
+      setIsSaved(false); 
       try {
         const content = editor?.getHTML() || "";
         if (noteId) {
@@ -120,7 +123,7 @@ export default function CreateNote() {
           });
           setNoteId(response.data.id);
         }
-        setIsSaved(true); // Set isSaved to true after successful save
+        setIsSaved(true);
       } catch (error) {
         console.error("Error auto-saving note:", error);
       } finally {
@@ -129,6 +132,11 @@ export default function CreateNote() {
     }, 2000),
     [title, tags, recordingUrl, editor, noteId]
   );
+
+  useEffect(() => {
+    const content = editor?.getHTML() || "";
+    autoSave(title, tags, content);
+  }, [title, tags, editor?.getHTML()]);
 
   useEffect(() => {
     if (transcript && editor) {
@@ -164,14 +172,18 @@ export default function CreateNote() {
   }, [isRecording]);
 
   const addTag = (tag: string) => {
-    if (!tags.includes(tag)) {
-      setTags([...tags, tag]);
-    }
+    setTags((prevTags) => {
+      if (!prevTags.includes(tag)) {
+        return [...prevTags, tag];
+      }
+      return prevTags;
+    });
   };
-
+  
   const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
+    setTags((prevTags) => prevTags.filter((t) => t !== tag));
   };
+  
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -222,6 +234,7 @@ export default function CreateNote() {
         setRecordingUrl(null);
         setRecordingId(null);
         setIsRecording(false);
+        setShowRecorder(false);
       } else {
         console.error("Error deleting recording:", error);
       }
@@ -256,6 +269,34 @@ export default function CreateNote() {
     }
   };
 
+  const startPlayback = () => {
+    if (recordingUrl && !isRecording) {
+      setIsPlaying(true);
+      setPlayTime(0);
+      const audio = new Audio(recordingUrl);
+      audio.play();
+
+      audio.onended = () => {
+        setIsPlaying(false);
+        setPlayTime(0);
+      };
+    }
+  };
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordingTime((prevTime) => prevTime + 1);
+      }, 1000);
+    } else if (isPlaying) {
+      interval = setInterval(() => {
+        setPlayTime((prevTime) => prevTime + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isRecording, isPlaying]);
+
   return (
     <div className="bg-gray-950 min-h-screen w-full max-w-md mx-auto p-6 text-white">
       <header className="flex justify-between items-center mb-6">
@@ -287,7 +328,11 @@ export default function CreateNote() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          {isSaved && <Link href="/dashboard" className="text-green-500 ml-2">Done</Link>}
+          {isSaved && (
+            <Link href="/dashboard" className="text-green-500 ml-2">
+              Done
+            </Link>
+          )}
         </div>
       </header>
 
@@ -347,6 +392,73 @@ export default function CreateNote() {
       <div className="fixed bottom-8 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors">
         <Sparkles size={24} />
       </div>
+
+      {showRecorder && (
+        <ReactMediaRecorder
+          audio
+          onStart={() => {
+            setIsRecording(true);
+            setRecordingTime(0);
+          }}
+          onStop={handleStopRecording}
+          render={({ startRecording, stopRecording }) => (
+            <div>
+              <div className="mt-8 bg-gray-700 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={
+                        isRecording
+                          ? stopRecording
+                          : isPlaying
+                          ? null
+                          : recordingUrl
+                          ? startPlayback
+                          : startRecording
+                      }
+                      className={`p-2 rounded-full ${
+                        isRecording
+                          ? "bg-red-600"
+                          : isPlaying
+                          ? "bg-blue-600"
+                          : "bg-green-600"
+                      }`}
+                      disabled={isRecording && isPlaying}
+                    >
+                      {isRecording ? (
+                        <Square size={20} fill="white" />
+                      ) : isPlaying ? (
+                        <Square size={20} fill="white" />
+                      ) : (
+                        <Play size={20} />
+                      )}
+                    </button>
+                    <span className="text-sm">
+                      {isPlaying
+                        ? formatTime(playTime)
+                        : formatTime(recordingTime)}
+                    </span>
+                  </div>
+                  {recordingUrl && (
+                    <button
+                      type="button"
+                      className="text-red-500 hover:text-red-400"
+                      onClick={deleteRecording}
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <h4 className="text-sm text-gray-400 mb-2">
+                Note: Only the last recording will be saved. Delete if not
+                needed.
+              </h4>
+            </div>
+          )}
+        />
+      )}
 
       <div className="mt-8">
         <h3 className="text-lg font-semibold mb-2">Tags</h3>
@@ -413,54 +525,6 @@ export default function CreateNote() {
           )}
         />
       </div>
-
-      {showRecorder && (
-        <ReactMediaRecorder
-          audio
-          onStart={() => {
-            setIsRecording(true);
-            setRecordingTime(0);
-          }}
-          onStop={handleStopRecording}
-          render={({ startRecording, stopRecording }) => (
-            <div>
-              <div className="mt-8 bg-gray-700 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={`p-2 rounded-full ${
-                        isRecording ? "bg-red-600" : "bg-green-600"
-                      }`}
-                    >
-                      {isRecording ? (
-                        <Square size={20} fill="white" />
-                      ) : (
-                        <Mic size={20} />
-                      )}
-                    </button>
-                    <span className="text-sm">{formatTime(recordingTime)}</span>
-                  </div>
-                  {recordingUrl && (
-                    <button
-                      type="button"
-                      className="text-red-500 hover:text-red-400"
-                      onClick={deleteRecording}
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  )}
-                </div>
-              </div>
-              <h4 className="text-sm text-gray-400 mb-2">
-                Note: Only the last recording will be saved. Delete if not
-                needed.
-              </h4>
-            </div>
-          )}
-        />
-      )}
 
       {isSaving && (
         <p className="fixed bottom-4 left-4 text-sm text-gray-400">Saving...</p>
