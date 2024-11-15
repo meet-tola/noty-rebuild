@@ -30,6 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const TiptapEditor = dynamic(
   () => import("@tiptap/react").then((mod) => mod.EditorContent),
@@ -39,6 +40,11 @@ const TiptapEditor = dynamic(
 );
 
 const sampleTags = ["work", "personal", "ideas", "todo", "important"];
+
+const genAI = new GoogleGenerativeAI(
+  process.env.NEXT_PUBLIC_GOOGLE_API_KEY as string
+);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 export default function EditNote({ params }: { params: { id: string } }) {
   const [title, setTitle] = useState("");
@@ -52,6 +58,8 @@ export default function EditNote({ params }: { params: { id: string } }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [pinnedNote, setPinnedNote] = useState("");
+
+  const [isLoaderLoading, setIsLoaderLoading] = useState(false);
 
   const router = useRouter();
 
@@ -156,14 +164,30 @@ export default function EditNote({ params }: { params: { id: string } }) {
 
   const addTag = (tag: string) => {
     if (tags && Array.isArray(tags) && !tags.includes(tag)) {
-      setTags((prevTags) => [...prevTags, tag]);
+      const updatedTags = [...tags, tag];
+      setTags(updatedTags);
+      autoSave(updatedTags);
     }
-    autoSave();
   };
 
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
-    autoSave();
+  const removeTag = async (tag: string) => {
+    const updatedTags = tags.filter((t) => t !== tag);
+    setTags(updatedTags);
+    setIsSaved(false);
+
+    try {
+      const response = await axios.patch(`/api/note/${params.id}`, {
+        tags: updatedTags,
+      });
+      if (response.data.tags) {
+        setTags(response.data.tags);
+      }
+    } catch (error) {
+      console.error("Error removing tag:", error);
+      setTags((prevTags) => [...prevTags, tag]);
+    } finally {
+      setIsSaved(true);
+    }
   };
 
   const togglePlayback = () => {
@@ -227,6 +251,34 @@ export default function EditNote({ params }: { params: { id: string } }) {
       window.location.reload();
     } catch (error) {
       console.error("Error toggling pin status:", error);
+    }
+  };
+
+  const handleSparklesClick = async () => {
+    if (!editor) {
+      console.error("Editor is not initialized.");
+      return;
+    }
+
+    const content = editor?.getHTML() || "";
+
+    if (!content || content.trim() === "") {
+      console.error("No content to rephrase.");
+      return;
+    }
+
+    setIsLoaderLoading(true); // Start loading
+    try {
+      const prompt = `Rephrase the following content to improve clarity and grammar:\n\n${content}`;
+      const result = await model.generateContent(prompt);
+      const rephrasedText = result.response.text();
+
+      // Insert rephrased content back into the editor
+      editor.chain().focus().setContent(rephrasedText).run();
+    } catch (error) {
+      console.error("Error generating rephrased content:", error);
+    } finally {
+      setIsLoaderLoading(false); // Stop loading
     }
   };
 
@@ -328,8 +380,15 @@ export default function EditNote({ params }: { params: { id: string } }) {
         </div>
         <TiptapEditor editor={editor} />
       </form>
-      <div className="fixed bottom-24 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors">
-        <Sparkles size={24} />
+      <div
+        className="fixed bottom-24 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors"
+        onClick={!isLoaderLoading ? handleSparklesClick : undefined} // Disable click when loading
+      >
+        {isLoaderLoading ? (
+          <Loader2 className="animate-spin" size={24} />
+        ) : (
+          <Sparkles size={24} />
+        )}
       </div>
       <div className="fixed bottom-6 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors">
         <Mic size={24} />

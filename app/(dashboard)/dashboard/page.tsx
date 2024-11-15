@@ -56,7 +56,7 @@ export default function Note() {
   const [showTags, setShowTags] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"gallery" | "list">("list");
+  const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
   const [sortBy, setSortBy] = useState<"date" | "title">("date");
   const [selectedNotes, setSelectedNotes] = useState<number[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -69,7 +69,7 @@ export default function Note() {
 
   useEffect(() => {
     if (searchQuery === "" && selectedTag === null) {
-      fetchNotes();
+      fetchNotes(); // Fetch all notes
     } else {
       const filtered = filteredNotes.filter(
         (note) =>
@@ -92,6 +92,8 @@ export default function Note() {
       setGroupedNotes(groupNotesByDate(sortedNotes));
     }
   }, [searchQuery, selectedTag, sortBy]);
+
+  
 
   const fetchNotes = async () => {
     setIsLoading(true);
@@ -240,94 +242,102 @@ export default function Note() {
     );
   };
 
-  const renderNoteCard = (note: Note) => (
-    <div
-      key={note.id}
-      className={`bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors relative ${
-        viewMode === "gallery" ? "h-32" : "h-20"
-      }`}
-      onClick={() =>
-        isSelectionMode
-          ? toggleNoteSelection(note.id)
-          : (window.location.href = `/edit-note/${note.id}`)
-      }
-    >
-      <div className="flex justify-between items-start mb-2">
-        <h3 className="font-semibold text-gray-100 truncate pr-6">
-          {note.title || "No title"}
-        </h3>
-        {isSelectionMode ? (
-          <div
-            className={`w-5 h-5 border-2 rounded ${
-              selectedNotes.includes(note.id)
-                ? "bg-purple-500 border-purple-500"
-                : "border-gray-400"
-            }`}
-          >
-            {selectedNotes.includes(note.id) && (
-              <Check size={16} className="text-white" />
-            )}
-          </div>
-        ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="text-gray-400 hover:text-gray-100 transition-colors absolute top-4 right-4"
-              >
-                <MoreVertical size={16} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  window.location.href = `/edit-note/${note.id}`;
-                }}
-              >
-                <Edit2 size={14} className="mr-2" />
-                Edit Note
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  togglePinNote(note.id, note.isPinned);
-                }}
-              >
-                <Pin size={14} className="mr-2" />
-                {note.isPinned ? "Unpin Note" : "Pin Note"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  deleteNote(note.id);
-                }}
-              >
-                <Trash2 size={14} className="mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-      <div className="flex justify-between items-end">
-        <p className="text-sm text-gray-400 truncate flex-grow pr-2">
-          {stripHtml(note.content)}
-        </p>
-        <span className="text-xs text-gray-500 whitespace-nowrap">
-          {new Date(note.date).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
-      </div>
-      {viewMode === "gallery" && (
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="flex flex-wrap gap-1 mt-2">
-            {note.tags.slice(0, 2).map((tag) => (
+  const renderNoteCard = (note: Note) => {
+    const visibleTags = note.tags.slice(0, 2);
+    const remainingTagsCount = note.tags.length - visibleTags.length;
+
+    return (
+      <div
+        key={note.id}
+        className={`bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors relative ${
+          viewMode === "gallery" ? "h-32" : "h-[5.5rem]"
+        }`}
+        onClick={() =>
+          isSelectionMode
+            ? toggleNoteSelection(note.id)
+            : (window.location.href = `/edit-note/${note.id}`)
+        }
+      >
+        {/* Title and Dropdown Menu */}
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="font-semibold text-gray-100 truncate pr-8">
+            {note.title || "No title"}
+          </h3>
+          {isSelectionMode ? (
+            <div
+              className={`w-5 h-5 border-2 rounded ${
+                selectedNotes.includes(note.id)
+                  ? "bg-purple-500 border-purple-500"
+                  : "border-gray-400"
+              } flex items-center justify-center`}
+            >
+              {selectedNotes.includes(note.id) && (
+                <Check size={16} className="text-white" />
+              )}
+            </div>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-gray-400 hover:text-gray-100 transition-colors"
+                >
+                  <MoreVertical size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = `/edit-note/${note.id}`;
+                  }}
+                >
+                  <Edit2 size={14} className="mr-2" />
+                  Edit Note
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    togglePinNote(note.id, note.isPinned);
+                  }}
+                >
+                  <Pin size={14} className="mr-2" />
+                  {note.isPinned ? "Unpin Note" : "Pin Note"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    deleteNote(note.id);
+                  }}
+                >
+                  <Trash2 size={14} className="mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex justify-between items-end mb-2">
+          <p className="text-sm text-gray-400 truncate flex-grow pr-2">
+            {stripHtml(note.content)}
+          </p>
+          <span className="text-xs text-gray-500 whitespace-nowrap">
+            {new Date(note.date).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
+
+        {/* Tags (only in gallery view) */}
+        {viewMode === "gallery" && (
+          <div className="flex items-center space-x-2">
+            {visibleTags.map((tag) => (
               <span
                 key={tag.id}
                 className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-full"
@@ -335,19 +345,21 @@ export default function Note() {
                 {tag.name}
               </span>
             ))}
-            {note.tags.length > 2 && (
-              <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-full">
-                +{note.tags.length - 2}
+            {remainingTagsCount > 0 && (
+              <span className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-full">
+                +{remainingTagsCount}
               </span>
             )}
           </div>
-        </div>
-      )}
-      {note.isPinned && (
-        <Pin size={16} className="absolute top-4 right-10 text-purple-500" />
-      )}
-    </div>
-  );
+        )}
+
+        {/* Pin Icon */}
+        {note.isPinned && (
+          <Pin size={16} className="absolute top-4 right-10 text-purple-500" />
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-gray-950 min-h-screen w-full max-w-md mx-auto p-6 text-gray-100">
@@ -430,6 +442,17 @@ export default function Note() {
         {showTags && (
           <div className="scrollbar-none overflow-x-auto whitespace-nowrap pb-2">
             <div className="inline-flex space-x-2">
+              <button
+                onClick={() => handleTagClick(null)} // Null represents "All" tag
+                className={`px-3 py-1 rounded-full text-sm ${
+                  selectedTag === null
+                    ? "bg-purple-700 text-gray-100"
+                    : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                }`}
+              >
+                <Tag size={14} className="inline mr-1" />
+                All
+              </button>
               {isLoading
                 ? Array(5)
                     .fill(0)
@@ -440,20 +463,18 @@ export default function Note() {
                       />
                     ))
                 : allTags.map((tag) => (
-                    <div key={tag.id} className="flex items-center gap-2">
-                      <span>Search by Tags:</span>
-                      <button
-                        onClick={() => handleTagClick(tag.name)}
-                        className={`px-3 py-1 rounded-full text-sm ${
-                          selectedTag === tag.name
-                            ? "bg-purple-700 text-gray-100"
-                            : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                        }`}
-                      >
-                        <Tag size={14} className="inline mr-1" />
-                        {tag.name}
-                      </button>
-                    </div>
+                    <button
+                      key={tag.id}
+                      onClick={() => handleTagClick(tag.name)}
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        selectedTag === tag.name
+                          ? "bg-purple-700 text-gray-100"
+                          : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                      }`}
+                    >
+                      <Tag size={14} className="inline mr-1" />
+                      {tag.name}
+                    </button>
                   ))}
             </div>
           </div>
@@ -474,17 +495,19 @@ export default function Note() {
         {isLoading ? (
           <div
             className={`${
-              viewMode === "gallery" ? "grid grid-cols-2 gap-4" : "space-y-4"
+              viewMode === "gallery" ? " absolute w-[400px] grid grid-cols-2 gap-4" : "space-y-4"
             }`}
           >
             {Array(6)
-              .fill(0)
-              .map((_, index) => (
-                <Skeleton
-                  key={index}
-                  className="h-20 w-full rounded-lg bg-gray-800"
-                />
-              ))}
+      .fill(0)
+      .map((_, index) => (
+        <Skeleton
+          key={index}
+          className={`rounded-lg ${
+            viewMode === "gallery" ? "h-32" : "h-[5.5rem] w-full"
+          } bg-gray-800`}
+        />
+      ))}
           </div>
         ) : Object.keys(groupedNotes).every(
             (key) => groupedNotes[key].length === 0

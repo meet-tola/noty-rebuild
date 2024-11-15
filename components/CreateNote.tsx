@@ -17,6 +17,7 @@ import {
   Pin,
   CircleEllipsis,
   Play,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -38,6 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
@@ -63,6 +65,11 @@ const generateRandomString = (length: number) => {
   return result;
 };
 
+const genAI = new GoogleGenerativeAI(
+  process.env.NEXT_PUBLIC_GOOGLE_API_KEY as string
+);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
 export default function CreateNote() {
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -77,6 +84,8 @@ export default function CreateNote() {
   const [pinnedNote, setPinnedNote] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playTime, setPlayTime] = useState(0);
+
+  const [isLoading, setIsLoading] = useState(false);
 
   const router = useRouter();
 
@@ -176,12 +185,11 @@ export default function CreateNote() {
       const newTags = prevTags.includes(tag) ? prevTags : [...prevTags, tag];
       return newTags;
     });
-  };  
+  };
 
   const removeTag = (tag: string) => {
     setTags(tags.filter((t) => t !== tag));
   };
-
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -295,6 +303,34 @@ export default function CreateNote() {
     return () => clearInterval(interval);
   }, [isRecording, isPlaying]);
 
+  const handleSparklesClick = async () => {
+    if (!editor) {
+      console.error("Editor is not initialized.");
+      return;
+    }
+
+    const content = editor.getHTML();
+
+    if (!content || content.trim() === "") {
+      console.error("No content to rephrase.");
+      return;
+    }
+
+    setIsLoading(true); // Start loading
+    try {
+      const prompt = `Rephrase the following content to improve clarity and grammar:\n\n${content}`;
+      const result = await model.generateContent(prompt);
+      const rephrasedText = result.response.text();
+
+      // Insert rephrased content back into the editor
+      editor.chain().focus().setContent(rephrasedText).run();
+    } catch (error) {
+      console.error("Error generating rephrased content:", error);
+    } finally {
+      setIsLoading(false); // Stop loading
+    }
+  };
+
   return (
     <div className="bg-gray-950 min-h-screen w-full max-w-md mx-auto p-6 text-white">
       <header className="flex justify-between items-center mb-6">
@@ -387,8 +423,15 @@ export default function CreateNote() {
         </div>
         <TiptapEditor editor={editor} />
       </form>
-      <div className="fixed bottom-8 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors">
-        <Sparkles size={24} />
+      <div
+        className="fixed bottom-8 right-6 bg-gray-800 p-3 rounded-full text-white cursor-pointer hover:bg-gray-700 transition-colors"
+        onClick={!isLoading ? handleSparklesClick : undefined} // Disable click when loading
+      >
+        {isLoading ? (
+          <Loader2 className="animate-spin" size={24} />
+        ) : (
+          <Sparkles size={24} />
+        )}
       </div>
 
       {showRecorder && (
